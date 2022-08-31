@@ -1,0 +1,229 @@
+---
+title: "Dashboard-20220829"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    output: html_document
+---
+
+
+Row
+-------------------------------------
+
+```{r setup, include=FALSE}
+setwd("D:\\BI\\dashboard")
+library(flexdashboard)
+# input 开户与占比数据
+open1 = 68113
+open2 = 181742
+prop=21.25
+open3 = round(open2*100/prop)
+```
+
+```{r,echo=FALSE}
+# read 开户明细 from 二维码系统
+library(openxlsx)
+library(dplyr)
+options(encoding = "utf-8")
+suppressMessages(library(dplyr))
+options(warn = -1)
+open.x1 <- rbind(
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m7.xlsx"),
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m6.xlsx"),
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m5.xlsx"),
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m4.xlsx"),
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m3.xlsx"),
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m2.xlsx"),
+  read.xlsx("D:\\BI\\获客日报\\开户\\2022m1.xlsx")
+)
+o <- list.files("D:\\BI\\获客日报\\开户")
+open.x2<-read.xlsx(paste("D:\\BI\\获客日报\\开户\\",o[156],sep = ''))
+for (i in 157:176){
+  open.x2<-rbind(open.x2,read.xlsx(paste("D:\\BI\\获客日报\\开户\\",o[i],sep = ''),sheet=1))
+}
+
+open.acc <- rbind(open.x1,open.x2)
+index <- duplicated(open.acc$客户手机号)
+open.acc <- open.acc[!index,]
+qudao<-read.xlsx("D:\\BI\\月报\\match-renew.xlsx",cols = 1:3)
+colnames(qudao)[1] <- c("方案名称")
+feed <- open.acc %>%
+  left_join(qudao,c("方案名称")) %>%
+  subset(预设关系与实际结果对比=="一致")
+```
+
+### 当年开户总数
+
+```{r}
+valueBox(open1,color = "#BBFFBB")
+```
+
+### 当年浙分开户
+
+```{r}
+valueBox(open2,color = "#FFCBB3")
+```
+
+### 当年系统开户
+
+```{r}
+valueBox(open3,color = "#FFC1E0")
+```
+
+
+Row
+-------------------------------------
+
+### 10万开户达成率
+
+```{r}
+rate <- round(open1*100/100000,digits = 2)
+gauge(rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(60, 100), warning = c(30, 59), danger = c(0, 29)
+))
+```
+
+### 当年浙分占比
+
+```{r}
+rating <- round(open1*100/open2,digits = 2)
+gauge(rating, min = 0, max = 100, symbol = '%',gaugeSectors(
+  success = c(41, 50), warning = c(21, 40), danger = c(0, 20)
+))
+```
+
+### 当年系统占比
+
+```{r}
+cancellations <- round(open1*100/open3,digits = 2)
+gauge(cancellations, min = 0, max = 100, symbol = '%',gaugeSectors(
+  success = c(0, 2), warning = c(3, 6), danger = c(7, 10)
+))
+```
+
+Row{data-height=400}
+-------------------------------------
+
+### 昨日开户
+```{r}
+library(formattable)
+library(openxlsx)
+library(dplyr)
+qudao<-read.xlsx("D:\\BI\\获客日报\\match-renew2021.xlsx",cols=1:3) #输入匹配表
+colnames(qudao)[1] <- c("方案名称")
+date <- "20220825" #输入日报日期
+openac <- read.xlsx(paste("D:\\BI\\获客日报\\开户\\",date,".xlsx",sep='')) #输入开户表
+related <- read.xlsx(paste("D:\\BI\\获客日报\\关联\\",date,".xlsx",sep='')) #输入关联表
+related <- related[order(related$关联时间,decreasing = T),]
+index.r <- duplicated(related$客户手机号)
+related.unq <- related[!index.r,]
+related.unq <- left_join(related.unq,qudao,by=c("方案名称"))    
+openac <- left_join(openac,qudao,by=c("方案名称"))
+openac.yz <- openac[openac$预设关系与实际结果对比=="一致",]
+demo <- read.xlsx("D:\\BI\\获客日报\\demo.xlsx")
+for (i in 1:nrow(demo)){
+  demo$开户数[i] <- sum(openac.yz$细分渠道==demo$渠道[i],na.rm = T)
+  demo$关联数[i] <- sum(related.unq$细分渠道==demo$渠道[i],na.rm = T)
+}
+demo <- demo[order(demo$开户数,decreasing = T),]
+demo <- subset(demo,开户数>0)
+formattable(demo, list(
+  开户数=normalize_bar("pink", 0.2)
+))
+```
+
+### 昨日浙分占比
+```{r}
+library(echarts4r)
+zfzb <- round(230/770,digits = 2)
+liquid <- data.frame(val = c(zfzb, 0.2, 0.1))
+liquid |> 
+  e_charts() |> 
+  e_liquid(val) 
+```
+
+### 获客组成员
+```{r}
+library(echarts4r)
+df <- tibble(
+  name = "获客组",        # 1st level
+  children = list(
+    tibble(name = c("渠道", "运营", "中台"),             # 2nd level
+       children = list(
+         tibble(name = c("罗翔", "郑天宇")),   # 3rd level 
+         tibble(name = c("李立群", "刘尽寒","毛志来","陈思","龚紫君","辛颖")),
+         tibble(name = c("钱钰馨", "王楹"))  
+         
+       ))
+  )
+)
+
+df |> 
+  e_charts() |> 
+  e_tree()
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+
+### 非同花顺渠道开户趋势
+
+```{r,echo=FALSE}
+library(dplyr)
+dates <- seq.Date(as.Date("2022-01-01"), as.Date(Sys.Date()), by = "day")
+open.all <- data.frame(date=dates)
+open.all$date <- as.character(open.all$date)
+
+open.temp <- feed %>%
+  mutate(tag=1,date=开户时间) %>%
+  group_by(date,渠道) %>%
+  summarise(num=sum(tag)) %>%
+  subset(is.na(渠道)==F) %>%
+  subset(渠道!="同花顺")
+
+bigqd <- data.frame(qudao=c("信息流","搜索","第三方","自营","银行"))
+for (i in 1:nrow(bigqd)){
+  open.all <- open.all %>%
+    left_join(open.temp[open.temp$渠道==bigqd$qudao[i],c(1,3)],"date")
+}
+colnames(open.all)[2:ncol(open.all)]<-bigqd$qudao[1:nrow(bigqd)]
+open.all[is.na(open.all)] <- 0
+n0 <- apply(open.all == 0, 1, sum)
+i0 <- which(n0 == 5)
+open.all <- open.all[-i0,]
+# library(recharts)
+# eLine(open.all)
+library(echarts4r)
+open.all |> 
+  e_charts(date) |> 
+  e_line(信息流) |> 
+  e_line(搜索) |> 
+  e_line(第三方) |> 
+  e_line(自营) |> 
+  e_line(银行) |> 
+  e_datazoom(type="slider") |>
+  e_tooltip(trigger="axis")
+
+```
+
+
+
+### 信息流开户日历图
+```{r, echo=FALSE}
+feed.all <- feed %>%
+  subset(渠道=="信息流") %>%
+  mutate(tag=1,date=开户时间) %>%
+  group_by(date) %>%
+  summarise(num=sum(tag))
+suppressMessages(library(echarts4r))
+
+feed.all |> 
+      e_charts(date) |> 
+      e_calendar(range = "2022") |> 
+      e_heatmap(num, coord_system = "calendar") |> 
+      e_visual_map(max = 230)
+```
+
+
